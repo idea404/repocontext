@@ -15,6 +15,13 @@ import { gitLog, gitBlame } from './git.js';
 import { errorResult, okResult, log, DEFAULT_SEARCH_LIMIT } from './utils.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+const VERSION = pkg.version as string;
 
 const readOnly: ToolAnnotations = { readOnlyHint: true };
 
@@ -85,7 +92,7 @@ const listRootsSchema = z.object({});
 
 export async function startServer(): Promise<void> {
   const server = new McpServer(
-    { name: '@idea404/repocontext', version: '0.1.0' },
+    { name: '@idea404/repocontext', version: VERSION },
     { capabilities: {} },
   );
 

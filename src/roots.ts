@@ -42,7 +42,7 @@ export function isPathAllowed(targetPath: string): boolean {
   if (allowedRoots.length === 0) return false;
   return allowedRoots.some((root) => {
     const relative = path.relative(root.path, resolved);
-    return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+    return !relative.startsWith('..') && !path.isAbsolute(relative);
   });
 }
 
