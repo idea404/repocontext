@@ -1,4 +1,4 @@
-# @idea404/repocontext
+# `repocontext`
 
 **The only MCP server you need for context-efficient codebase learning.** 14 read-only tools, tree-sitter parsing, zero LSP overhead. Saves 90–100% of tokens vs naive file reading.
 
