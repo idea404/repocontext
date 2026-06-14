@@ -15,12 +15,14 @@ Add to opencode config:
   "mcpServers": {
     "repocontext": {
       "type": "local",
-      "command": ["npx", "-y", "@idea404/repocontext", "start"],
+      "command": ["sh", "-c", "cd /tmp \u0026\u0026 exec npx -y @idea404/repocontext start"],
       "enabled": true
     }
   }
 }
 ```
+
+> The `cd /tmp` wrapper avoids npm/npx resolving a local `package.json` when your agent's working directory happens to be the repocontext source repo itself. This ensures npx always uses the published package from the registry.
 
 ## Token budget
 
