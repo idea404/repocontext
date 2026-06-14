@@ -1,6 +1,6 @@
 {
   "name": "@idea404/repocontext",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "The only MCP server you need for context-efficient codebase learning",
   "type": "module",
   "main": "./dist/index.js",

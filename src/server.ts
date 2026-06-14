@@ -12,6 +12,18 @@ import { parseFile, detectLanguageForPath } from './parser.js';
 import { searchFiles, listFiles } from './search.js';
 import { findSymbols, traceSymbol, getImports } from './symbols.js';
 import { gitLog, gitBlame } from './git.js';
+import {
+  repoBriefSchema,
+  repoBriefHandler,
+  queryRepoSchema,
+  queryRepoHandler,
+  analyzeFileSchema,
+  analyzeFileHandler,
+  importGraphSchema,
+  importGraphHandler,
+  summarizeDocumentationSchema,
+  summarizeDocumentationHandler,
+} from './repo-tools.js';
 import { errorResult, okResult, log, DEFAULT_SEARCH_LIMIT } from './utils.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -579,6 +591,61 @@ export async function startServer(): Promise<void> {
         directoryStructure: sortedDirs.slice(0, 50),
       }, null, 2));
     },
+  );
+
+  // ── repo_brief ───────────────────────────────────────────────────────────
+  server.registerTool(
+    'repo_brief',
+    {
+      description: 'One-call repo overview: purpose, tech stack, languages, entry points, config files, and directory structure. Optimized for minimal tokens and a single tool call.',
+      inputSchema: repoBriefSchema,
+      annotations: readOnly,
+    },
+    async (args) => repoBriefHandler(args),
+  );
+
+  // ── query_repo ───────────────────────────────────────────────────────────
+  server.registerTool(
+    'query_repo',
+    {
+      description: 'Ask a natural-language question about the codebase and get back relevant files, symbols, and a snippet. Combines search, symbol extraction, and snippet reading into one call.',
+      inputSchema: queryRepoSchema,
+      annotations: readOnly,
+    },
+    async (args) => queryRepoHandler(args),
+  );
+
+  // ── analyze_file ─────────────────────────────────────────────────────────
+  server.registerTool(
+    'analyze_file',
+    {
+      description: 'Analyze a source file in one call: summary, symbols, imports, exports, or full analysis. Replaces multiple granular file tools.',
+      inputSchema: analyzeFileSchema,
+      annotations: readOnly,
+    },
+    async (args) => analyzeFileHandler(args),
+  );
+
+  // ── import_graph ─────────────────────────────────────────────────────────
+  server.registerTool(
+    'import_graph',
+    {
+      description: 'View module dependencies across the project. Without a module, returns top imported modules. With a module, shows what imports it or what it imports.',
+      inputSchema: importGraphSchema,
+      annotations: readOnly,
+    },
+    async (args) => importGraphHandler(args),
+  );
+
+  // ── summarize_documentation ──────────────────────────────────────────────
+  server.registerTool(
+    'summarize_documentation',
+    {
+      description: 'Read README, AGENTS.md, and other documentation files and return a concise summary.',
+      inputSchema: summarizeDocumentationSchema,
+      annotations: readOnly,
+    },
+    async (args) => summarizeDocumentationHandler(args),
   );
 
   // ── list_roots ──────────────────────────────────────────────────────────

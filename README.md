@@ -1,6 +1,6 @@
 # `repocontext`
 
-**The only MCP server you need for context-efficient codebase learning.** 14 read-only tools, tree-sitter parsing, zero LSP overhead. Saves 90–100% of tokens vs naive file reading.
+**The only MCP server you need for context-efficient codebase learning.** 19 read-only tools, tree-sitter parsing, zero LSP overhead. Saves 90–100% of tokens vs naive file reading and minimizes the number of tool calls needed to learn a repo.
 
 ## Quick start
 
@@ -38,7 +38,12 @@ Measured on the repocontext repo itself (10 source files, 636-line `server.ts`):
 
 | Tool | Returns |
 |---|---|
-| `get_project_overview` | Language counts, entry points, config files, directory tree |
+| `repo_brief` | One-call repo overview: purpose, stack, languages, entry points, config files |
+| `query_repo` | Ask a question, get relevant files + symbols + snippet |
+| `analyze_file` | Consolidated symbols/imports/exports for a file |
+| `import_graph` | Top imported modules or who imports a specific module |
+| `summarize_documentation` | README + docs summary |
+| `get_project_overview` | Detailed language/entry-point/directory statistics |
 | `list_directory` | Files/subdirs in a path (depth-controlled) |
 | `glob_files` | Files matching a glob pattern |
 | `get_file_outline` | Symbols, imports, exports — no file body |
@@ -53,7 +58,7 @@ Measured on the repocontext repo itself (10 source files, 636-line `server.ts`):
 | `detect_language` | Language by extension |
 | `list_roots` | Allowed filesystem roots |
 
-All read-only, bounded, and root-safe.
+All read-only, bounded, and root-safe. Use the top 5 tools to learn a repo in the fewest calls and tokens.
 
 ## Why tree-sitter
 
