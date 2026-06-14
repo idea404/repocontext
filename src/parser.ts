@@ -1,49 +1,52 @@
-import Parser from 'tree-sitter';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import * as Parser from 'web-tree-sitter';
 import { makeAllowedPath } from './roots.js';
 import { DEFAULT_MAX_FILE_BYTES, DEFAULT_PARSER_CACHE_SIZE, log } from './utils.js';
 import type { ParseResult } from './types.js';
 
 const require = createRequire(import.meta.url);
 
-type LanguageLoader = () => unknown | Promise<unknown>;
+let parserInitPromise: Promise<void> | null = null;
 
-const cjs = (pkg: string) => (): unknown => require(pkg);
-const cjsNamed = (pkg: string, name: string) => (): unknown => require(pkg)[name];
-const esmDefault = (pkg: string) => async (): Promise<unknown> => {
-  const { default: mod } = (await import(pkg)) as { default: unknown };
-  return mod;
-};
-const esmNamed = (pkg: string, name: string) => async (): Promise<unknown> => {
-  const { default: mod } = (await import(pkg)) as { default: Record<string, unknown> };
-  return mod[name];
-};
+async function ensureParserInit(): Promise<void> {
+  if (!parserInitPromise) {
+    parserInitPromise = Parser.Parser.init();
+  }
+  return parserInitPromise;
+}
 
-const languagePackages: Record<string, LanguageLoader> = {
-  typescript: cjsNamed('tree-sitter-typescript', 'typescript'),
-  tsx: cjsNamed('tree-sitter-typescript', 'tsx'),
-  javascript: cjs('tree-sitter-javascript'),
-  python: cjs('tree-sitter-python'),
-  go: cjs('tree-sitter-go'),
-  rust: cjs('tree-sitter-rust'),
-  java: cjs('tree-sitter-java'),
-  c: cjs('tree-sitter-c'),
-  cpp: cjs('tree-sitter-cpp'),
-  bash: cjs('tree-sitter-bash'),
-  ruby: cjs('tree-sitter-ruby'),
-  swift: cjs('tree-sitter-swift'),
-  kotlin: cjs('tree-sitter-kotlin'),
-  elixir: cjs('tree-sitter-elixir'),
-  haskell: cjs('tree-sitter-haskell'),
-  scala: cjs('tree-sitter-scala'),
-  json: cjs('tree-sitter-json'),
-  html: cjs('tree-sitter-html'),
-  php: esmNamed('tree-sitter-php', 'php'),
-  ocaml: esmNamed('tree-sitter-ocaml', 'ocaml'),
-  csharp: esmDefault('tree-sitter-c-sharp'),
-  css: esmDefault('tree-sitter-css'),
-  perl: esmDefault('tree-sitter-perl'),
+const wasmNameByLanguage: Record<string, string> = {
+  typescript: 'tree-sitter-typescript',
+  tsx: 'tree-sitter-tsx',
+  javascript: 'tree-sitter-javascript',
+  python: 'tree-sitter-python',
+  go: 'tree-sitter-go',
+  rust: 'tree-sitter-rust',
+  java: 'tree-sitter-java',
+  c: 'tree-sitter-c',
+  cpp: 'tree-sitter-cpp',
+  bash: 'tree-sitter-bash',
+  ruby: 'tree-sitter-ruby',
+  swift: 'tree-sitter-swift',
+  kotlin: 'tree-sitter-kotlin',
+  elixir: 'tree-sitter-elixir',
+  scala: 'tree-sitter-scala',
+  json: 'tree-sitter-json',
+  html: 'tree-sitter-html',
+  php: 'tree-sitter-php',
+  ocaml: 'tree-sitter-ocaml',
+  csharp: 'tree-sitter-c_sharp',
+  css: 'tree-sitter-css',
+  lua: 'tree-sitter-lua',
+  dart: 'tree-sitter-dart',
+  zig: 'tree-sitter-zig',
+  yaml: 'tree-sitter-yaml',
+  toml: 'tree-sitter-toml',
+  vue: 'tree-sitter-vue',
+  elm: 'tree-sitter-elm',
+  elisp: 'tree-sitter-elisp',
+  objc: 'tree-sitter-objc',
 };
 
 const extensionToLanguage: Record<string, string> = {
@@ -71,8 +74,6 @@ const extensionToLanguage: Record<string, string> = {
   kts: 'kotlin',
   ex: 'elixir',
   exs: 'elixir',
-  hs: 'haskell',
-  lhs: 'haskell',
   scala: 'scala',
   sc: 'scala',
   json: 'json',
@@ -83,8 +84,16 @@ const extensionToLanguage: Record<string, string> = {
   mli: 'ocaml',
   cs: 'csharp',
   css: 'css',
-  pl: 'perl',
-  pm: 'perl',
+  lua: 'lua',
+  dart: 'dart',
+  zig: 'zig',
+  yml: 'yaml',
+  yaml: 'yaml',
+  toml: 'toml',
+  vue: 'vue',
+  elm: 'elm',
+  el: 'elisp',
+  m: 'objc',
 };
 
 interface CacheEntry {
@@ -94,20 +103,30 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
-const parsers = new Map<string, Parser>();
-const languageObjects = new Map<string, unknown>();
+const parsers = new Map<string, Parser.Parser>();
+const languageObjects = new Map<string, Parser.Language>();
 
-function getLanguageSync(language: string): unknown {
-  return languageObjects.get(language) ?? null;
+function resolveWasmPath(language: string): string | null {
+  const wasmName = wasmNameByLanguage[language];
+  if (!wasmName) return null;
+  try {
+    return require.resolve(`tree-sitter-wasms/out/${wasmName}.wasm`);
+  } catch (err) {
+    log('warning', `Could not resolve WASM for ${language}: ${err}`);
+    return null;
+  }
 }
 
-async function getLanguage(language: string): Promise<unknown> {
+async function getLanguage(language: string): Promise<Parser.Language | null> {
   const cached = languageObjects.get(language);
   if (cached) return cached;
-  const loader = languagePackages[language];
-  if (!loader) return null;
+
+  const wasmPath = resolveWasmPath(language);
+  if (!wasmPath) return null;
+
   try {
-    const lang = await loader();
+    await ensureParserInit();
+    const lang = await Parser.Language.load(wasmPath);
     if (lang) languageObjects.set(language, lang);
     return lang ?? null;
   } catch (err) {
@@ -116,15 +135,15 @@ async function getLanguage(language: string): Promise<unknown> {
   }
 }
 
-async function getParser(language: string): Promise<Parser | null> {
+async function getParser(language: string): Promise<Parser.Parser | null> {
   const existing = parsers.get(language);
   if (existing) return existing;
 
   const lang = await getLanguage(language);
   if (!lang) return null;
 
-  const parser = new Parser();
-  parser.setLanguage(lang as Parser.Language);
+  const parser = new Parser.Parser();
+  parser.setLanguage(lang);
   parsers.set(language, parser);
   return parser;
 }
@@ -177,10 +196,11 @@ export async function parseFile(filePath: string): Promise<ParseResult | null> {
   const parser = await getParser(language);
   if (!parser) return null;
 
-  const langObj = getLanguageSync(language);
+  const langObj = languageObjects.get(language) ?? null;
 
   try {
     const tree = parser.parse(source);
+    if (!tree) return null;
     const result = extractResult(tree, language, source, stat.size, langObj);
     evictIfNeeded();
     cache.set(cacheKey, { result, mtimeMs: stat.mtimeMs, size: stat.size });
@@ -196,7 +216,7 @@ function extractResult(
   language: string,
   fileSource: string,
   totalBytes: number,
-  langObj: unknown,
+  langObj: Parser.Language | null,
 ): ParseResult {
   const lines = fileSource.split('\n');
   const totalLines = lines.length;
@@ -230,7 +250,7 @@ function extractStructure(
   tree: Parser.Tree,
   language: string,
   fileSource: string,
-  langObj: unknown,
+  langObj: Parser.Language | null,
 ): ParseResult['structure'] {
   const result: ParseResult['structure'] = [];
 
@@ -334,14 +354,6 @@ function extractStructure(
         (function_definition name: (identifier) @name) @decl
       ]
     `,
-    haskell: `
-      [
-        (function name: (variable) @name) @decl
-        (data_declaration name: (type) @name) @decl
-        (class_declaration name: (type) @name) @decl
-        (instance_declaration name: (type) @name) @decl
-      ]
-    `,
     elixir: `
       [
         (call
@@ -371,22 +383,25 @@ function extractStructure(
         (let_binding name: (value_name) @name) @decl
       ]
     `,
-    perl: `
-      [
-        (subroutine_declaration name: (identifier) @name) @decl
-        (package_declaration name: (identifier) @name) @decl
-      ]
-    `,
     css: '',
     html: '',
     json: '',
+    lua: '',
+    dart: '',
+    zig: '',
+    yaml: '',
+    toml: '',
+    vue: '',
+    elm: '',
+    elisp: '',
+    objc: '',
   };
 
   const queryText = queries[language];
   if (!queryText || !langObj) return result;
 
   try {
-    const query = new Parser.Query(langObj as Parser.Language, queryText);
+    const query = new Parser.Query(langObj, queryText);
     const matches = query.matches(tree.rootNode);
 
     for (const match of matches) {
@@ -435,7 +450,7 @@ function kindFromNode(type: string, _language: string): string {
   return type;
 }
 
-function extractImports(tree: Parser.Tree, language: string, langObj: unknown): ParseResult['imports'] {
+function extractImports(tree: Parser.Tree, language: string, langObj: Parser.Language | null): ParseResult['imports'] {
   const result: ParseResult['imports'] = [];
 
   const queries: Record<string, string> = {
@@ -464,7 +479,6 @@ function extractImports(tree: Parser.Tree, language: string, langObj: unknown): 
         (require_once_expression (string) @source) @import
       ]
     `,
-    haskell: '(import_declaration module: (module) @source) @import',
     scala: '(import_export_path path: (identifier) @source) @import',
     swift: '(import_declaration path: (identifier) @source) @import',
     csharp: '(using_directive name: (identifier) @source) @import',
@@ -474,17 +488,25 @@ function extractImports(tree: Parser.Tree, language: string, langObj: unknown): 
     kotlin: '',
     elixir: '',
     ocaml: '',
-    perl: '',
     css: '',
     html: '',
     json: '',
+    lua: '',
+    dart: '',
+    zig: '',
+    yaml: '',
+    toml: '',
+    vue: '',
+    elm: '',
+    elisp: '',
+    objc: '',
   };
 
   const queryText = queries[language];
   if (!queryText || !langObj) return result;
 
   try {
-    const query = new Parser.Query(langObj as Parser.Language, queryText);
+    const query = new Parser.Query(langObj, queryText);
     const matches = query.matches(tree.rootNode);
 
     for (const match of matches) {
@@ -502,7 +524,7 @@ function extractImports(tree: Parser.Tree, language: string, langObj: unknown): 
         isWildcard = decl.text.includes('*');
       } else if (['typescript', 'tsx', 'javascript'].includes(language)) {
         const specifierQuery = new Parser.Query(
-          langObj as Parser.Language,
+          langObj,
           '(import_specifier name: (identifier) @item)',
         );
         const specMatches = specifierQuery.matches(decl);
@@ -526,7 +548,7 @@ function extractExports(
   tree: Parser.Tree,
   language: string,
   structure: ParseResult['structure'],
-  langObj: unknown,
+  langObj: Parser.Language | null,
 ): ParseResult['exports'] {
   if (!['typescript', 'tsx', 'javascript', 'python', 'rust', 'go', 'swift', 'elixir', 'php'].includes(language)) {
     return [];
@@ -549,7 +571,7 @@ function extractExports(
   if (!queryText || !langObj) return result;
 
   try {
-    const query = new Parser.Query(langObj as Parser.Language, queryText);
+    const query = new Parser.Query(langObj, queryText);
     const matches = query.matches(tree.rootNode);
 
     for (const match of matches) {
@@ -570,26 +592,26 @@ function extractExports(
   return result;
 }
 
-function countNodes(node: Parser.SyntaxNode): number {
+function countNodes(node: Parser.Node): number {
   let count = 1;
   for (const child of node.children) {
-    count += countNodes(child);
+    if (child) count += countNodes(child);
   }
   return count;
 }
 
-function countErrors(node: Parser.SyntaxNode): number {
+function countErrors(node: Parser.Node): number {
   let count = node.type === 'ERROR' ? 1 : 0;
   for (const child of node.children) {
-    count += countErrors(child);
+    if (child) count += countErrors(child);
   }
   return count;
 }
 
-function maxDepth(node: Parser.SyntaxNode, current = 0): number {
+function maxDepth(node: Parser.Node, current = 0): number {
   let max = current;
   for (const child of node.children) {
-    max = Math.max(max, maxDepth(child, current + 1));
+    if (child) max = Math.max(max, maxDepth(child, current + 1));
   }
   return max;
 }

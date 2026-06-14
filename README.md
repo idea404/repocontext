@@ -59,10 +59,16 @@ All read-only, bounded, and root-safe.
 
 Every tool returns only **structural metadata** — symbol names, line ranges, import sources — never raw file contents. No LSP, no type checker, no semantic resolution.
 
+## Supported languages
+
+WASM-based tree-sitter grammars: TypeScript/TSX, JavaScript, Python, Go, Rust, Java, C/C++, C#, Bash, Ruby, Swift, Kotlin, Elixir, Scala, PHP, OCaml, CSS, HTML, JSON, Lua, Dart, Zig, YAML, TOML, Vue, Elm, Objective-C.
+
+Runs on any OS that supports Node.js, including NixOS, without native C++ compilation.
+
 ## Development
 
 ```bash
-npm install    # requires CXXFLAGS="-std=c++20" on Node 24+
+npm install
 npm run build
 npm test
 ```

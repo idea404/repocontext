@@ -6,7 +6,7 @@ async function main() {
   if (args.length === 0 || args[0] === 'start') {
     await startServer();
   } else if (args[0] === '--version' || args[0] === '-v') {
-    console.log('@idea404/repocontext 0.1.5');
+    console.log('@idea404/repocontext 0.1.6');
   } else {
     console.error(`Unknown command: ${args[0]}`);
     console.error('Usage: npx @idea404/repocontext [start]');
