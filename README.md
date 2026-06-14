@@ -1,6 +1,6 @@
 # `repocontext`
 
-**The only MCP server you need for context-efficient codebase learning.** 19 read-only tools, tree-sitter parsing, zero LSP overhead. Saves 90–100% of tokens vs naive file reading and minimizes the number of tool calls needed to learn a repo.
+**The only MCP server you need for context-efficient codebase learning.** 11 read-only tools, tree-sitter parsing, zero LSP overhead. Saves 90%+ tokens vs naive file reading and minimizes the number of tool calls needed to learn a repo.
 
 ## Quick start
 
@@ -24,45 +24,49 @@ Add to opencode config:
 
 ## Token budget
 
-Measured on the repocontext repo itself (10 source files, 636-line `server.ts`):
+**Benchmarked across 5 open-source repos** (express, flask, gin, json-server, regex — 28–437 files each, covering JS/Python/Go/Rust):
 
-| Scenario | Naive | repocontext | Saved |
-|---|---|---|---|
-| Read file structure | 5,986 tok | 500 tok | **92%** |
-| Find symbol across 10 files | 15,653 tok | 18 tok | **100%** |
-| Project overview (34 files) | 53,704 tok | 36 tok | **100%** |
+| Scenario | Naive (tok) | repocontext (tok) | Saved | Calls saved |
+|---|---|---|---|---|
+| Repo overview (README + config + ls) | 545–1,109 | **209–338** | **60–80%** | 4 → 1 |
+| Find symbol across codebase | 1,928–8,724 | **8–290** | **85–100%** | — |
+| File outline (whole file vs symbols) | 65–3,494 | **19–417** | **72–99%** | — |
+| Trace symbol (def + refs + git) | 715–7,014 | **608–825** | **15–89%** | 3 → 1 |
+| Dependencies (config + imports) | 1,172–3,678 | **26–436** | **90–99%** | 4 → 1 |
+| Recent changes (git log + names) | 173–3,750 | **40–56** | **76–99%** | — |
+| **Overall (30 scenarios)** | **63,536** | **6,526** | **90%** | **3–4 → 1** |
 
-*Naive = `cat`/`grep` on matching files. Tokens estimated at 4 chars/token.*
+Token estimate: 1 token ≈ 4 characters. Full methodology in [`BENCHMARK.md`](./BENCHMARK.md).
 
-## Tools (14 total)
+## Tools (11 total)
 
-| Tool | Returns |
+| Tool | Use it when you want to... |
 |---|---|
-| `repo_brief` | One-call repo overview: purpose, stack, languages, entry points, config files |
-| `query_repo` | Ask a question, get relevant files + symbols + snippet |
-| `analyze_file` | Consolidated symbols/imports/exports for a file |
-| `import_graph` | Top imported modules or who imports a specific module |
-| `summarize_documentation` | README + docs summary |
-| `get_project_overview` | Detailed language/entry-point/directory statistics |
-| `list_directory` | Files/subdirs in a path (depth-controlled) |
-| `glob_files` | Files matching a glob pattern |
-| `get_file_outline` | Symbols, imports, exports — no file body |
-| `read_file` | Line range or symbol body only |
-| `find_symbols` | Symbol name + location across project |
-| `find_imports` | Import list per file |
-| `trace_symbol` | Definition + references |
-| `search_code` | Matching lines with context |
-| `find_documentation` | README + docstring matches |
-| `git_log` | Recent commits for a file |
-| `git_blame` | Per-line author/history |
-| `detect_language` | Language by extension |
-| `list_roots` | Allowed filesystem roots |
+| `repo_overview` | Learn a repo in one call: purpose, stack, languages, entry points, config, structure |
+| `find` | Search files, symbols, or code content in one tool |
+| `read` | Read line ranges, symbol bodies, or structural outlines |
+| `query` | Ask a natural-language question and get relevant files + symbols |
+| `trace` | Trace a symbol: definition, references, recent commits, blame |
+| `deps` | See external dependencies and internal import graph |
+| `tests` | Find tests for a file or overall test coverage |
+| `changes` | See recent commits, authors, and hot files |
+| `docs` | Search README/markdown and code comments for a topic |
+| `analyze` | Deep-dive a file: symbols, imports, exports, refs, optional blame |
+| `roots` | Show allowed filesystem roots |
 
-All read-only, bounded, and root-safe. Use the top 5 tools to learn a repo in the fewest calls and tokens.
+All read-only, bounded, and root-safe.
+
+## Learning workflow
+
+1. Start with `repo_overview` to get the big picture.
+2. Ask `query` for specific mechanisms ("how does auth work?").
+3. Use `find` + `read` to drill into files.
+4. Use `trace` to follow a symbol across the codebase.
+5. Use `deps`, `tests`, and `changes` for cross-cutting context.
 
 ## Why tree-sitter
 
-Every tool returns only **structural metadata** — symbol names, line ranges, import sources — never raw file contents. No LSP, no type checker, no semantic resolution.
+Every tool returns only **structural metadata** — symbol names, line ranges, import sources — and avoids sending whole files unless requested. No LSP, no type checker, no semantic resolution.
 
 ## Supported languages
 
